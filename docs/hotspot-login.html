@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wi-Fi Login</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+    .wrap { max-width: 380px; margin: 32px auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 0 0 16px; color: #4b5563; }
+    label { display: block; margin: 10px 0 6px; font-size: 14px; }
+    input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .btn { display: inline-block; width: 100%; padding: 10px; margin-top: 12px; border: 0; border-radius: 8px; background: #0f766e; color: #fff; cursor: pointer; }
+    .plans { display: grid; gap: 8px; margin-top: 16px; }
+    .plan { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; cursor: pointer; background: #fff; }
+    .small { font-size: 12px; color: #6b7280; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Connect To Wi-Fi</h1>
+    <p>Pay with M-Pesa to get access.</p>
+
+    <label for="phone">Phone Number</label>
+    <input id="phone" placeholder="07XXXXXXXX" />
+
+    <div class="plans">
+      <button class="plan" onclick="buyPlan('7 Daily')">KSh 7 Daily</button>
+      <button class="plan" onclick="buyPlan('700 Monthly')">KSh 700 Monthly</button>
+      <button class="plan" onclick="buyPlan('30 mins 4 Mbps')">KSh 5 - 30 mins</button>
+    </div>
+
+    <div class="small">After payment, retry login automatically in ~10 seconds.</div>
+  </div>
+
+  <script>
+    const API_BASE = "https://your-billing-domain.com";
+
+    function normalizePhone(raw) {
+      let p = (raw || "").trim().replace(/\s+/g, "");
+      if (p.startsWith("+")) p = p.slice(1);
+      if (p.startsWith("07") && p.length === 10) return "254" + p.slice(1);
+      return p;
+    }
+
+    async function buyPlan(plan) {
+      const phone = normalizePhone(document.getElementById("phone").value);
+      if (!phone) {
+        alert("Enter phone number first");
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE}/api/mpesa/stkpush`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, package_name: plan })
+        });
+        if (!res.ok) throw new Error("STK request failed");
+        alert("STK Push sent. Complete payment on your phone.");
+      } catch (e) {
+        alert("Payment request failed. Please try again.");
+      }
+    }
+  </script>
+</body>
+</html>
+

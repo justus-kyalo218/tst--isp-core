@@ -1,0 +1,32 @@
+package routes
+
+import (
+	"net/http"
+
+	"tst-isp/internal/handlers"
+	"tst-isp/internal/middleware"
+)
+
+func Register() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/health", handlers.Health)
+	mux.HandleFunc("/api/auth/login", handlers.Login)
+	mux.HandleFunc("/api/mpesa/stkpush", handlers.MpesaSTKPush)
+	mux.HandleFunc("/api/mpesa/callback", handlers.MpesaCallback)
+	mux.HandleFunc("/api/subisp/register", handlers.SubIspRegister)
+
+	mux.Handle("/api/admin/users", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminUsers)))
+	mux.Handle("/api/admin/revenue", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminRevenue)))
+	mux.Handle("/api/admin/routers", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminRouters)))
+	mux.Handle("/api/admin/routers/test", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminRouters)))
+	mux.Handle("/api/admin/usage", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminUsage)))
+	mux.Handle("/api/admin/subisps", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminSubIsps)))
+	mux.Handle("/api/admin/subisps/update", middleware.RequireRole("super_admin")(http.HandlerFunc(handlers.AdminUpdateSubIsp)))
+
+	mux.Handle("/api/subisp/me", middleware.RequireRole("sub_isp")(http.HandlerFunc(handlers.SubIspMe)))
+	mux.Handle("/api/subisp/routers", middleware.RequireRole("sub_isp")(http.HandlerFunc(handlers.SubIspRouters)))
+	mux.Handle("/api/subisp/usage", middleware.RequireRole("sub_isp")(http.HandlerFunc(handlers.SubIspUsage)))
+
+	return middleware.CORS(mux)
+}

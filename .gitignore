@@ -1,0 +1,11 @@
+.env
+frontend/.env
+backend/.env
+tools/
+**/node_modules/
+**/.vite/
+**/dist/
+**/build/
+.qodo/
+*.log
+*.exe

@@ -1,0 +1,35 @@
+:root {
+  --bg: #0c1619;
+  --bg-deep: #0a1215;
+  --accent: #f4d06f;
+  --accent-2: #7fd1b9;
+  --card: #101f24;
+  --card-2: #132a31;
+  --text: #e8f1f3;
+  --muted: #b6c7cc;
+  --stroke: #27434a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Rajdhani", "Trebuchet MS", "Gill Sans", "Tahoma", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(900px 480px at 8% -10%, #1f4851 0%, transparent 60%),
+    radial-gradient(720px 420px at 90% 10%, #21463b 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg), var(--bg-deep) 72%);
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 44px 20px 72px;
+}
