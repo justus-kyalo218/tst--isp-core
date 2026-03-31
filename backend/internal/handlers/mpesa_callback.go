@@ -232,7 +232,13 @@ func normalizePhoneAny(v interface{}) string {
 	if strings.HasPrefix(s, "07") && len(s) == 10 {
 		return "254" + s[1:]
 	}
+	if strings.HasPrefix(s, "01") && len(s) == 10 {
+		return "254" + s[1:]
+	}
 	if strings.HasPrefix(s, "2547") && len(s) == 12 {
+		return s
+	}
+	if strings.HasPrefix(s, "2541") && len(s) == 12 {
 		return s
 	}
 	return s

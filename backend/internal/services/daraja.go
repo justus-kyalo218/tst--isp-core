@@ -178,7 +178,13 @@ func normalizePhone(phone string) (string, error) {
 	if strings.HasPrefix(phone, "07") && len(phone) == 10 {
 		return "254" + phone[1:], nil
 	}
+	if strings.HasPrefix(phone, "01") && len(phone) == 10 {
+		return "254" + phone[1:], nil
+	}
 	if strings.HasPrefix(phone, "2547") && len(phone) == 12 {
+		return phone, nil
+	}
+	if strings.HasPrefix(phone, "2541") && len(phone) == 12 {
 		return phone, nil
 	}
 	return "", errors.New("invalid phone number format")

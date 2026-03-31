@@ -66,8 +66,8 @@ func SubIspRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
 		return
 	}
-	if !strings.HasPrefix(req.Phone, "07") || len(req.Phone) != 10 {
-		writeError(w, http.StatusBadRequest, "phone must start with 07 and be 10 digits")
+	if len(req.Phone) != 10 || (!strings.HasPrefix(req.Phone, "07") && !strings.HasPrefix(req.Phone, "01")) {
+		writeError(w, http.StatusBadRequest, "phone must start with 07 or 01 and be 10 digits")
 		return
 	}
 	if req.PackageName == "" {

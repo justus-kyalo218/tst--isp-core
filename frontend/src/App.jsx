@@ -93,7 +93,7 @@ export default function App() {
 
   const phoneError = useMemo(() => {
     if (!phone) return "";
-    if (!phone.startsWith("07")) return "Phone must start with 07.";
+    if (!phone.startsWith("07") && !phone.startsWith("01")) return "Phone must start with 07 or 01.";
     if (phone.length !== 10) return "Phone must be 10 digits.";
     if (!/^\d+$/.test(phone)) return "Phone must be numeric.";
     return "";
@@ -101,7 +101,7 @@ export default function App() {
 
   const subPhoneError = useMemo(() => {
     if (!subRegData.phone) return "";
-    if (!subRegData.phone.startsWith("07")) return "Phone must start with 07.";
+    if (!subRegData.phone.startsWith("07") && !subRegData.phone.startsWith("01")) return "Phone must start with 07 or 01.";
     if (subRegData.phone.length !== 10) return "Phone must be 10 digits.";
     if (!/^\d+$/.test(subRegData.phone)) return "Phone must be numeric.";
     return "";
@@ -120,7 +120,7 @@ export default function App() {
     subRegData.phone &&
     !subPhoneError &&
     !subPasswordError;
-  const isSubIsp = authEnabled && role === "sub_isp";
+  const isSubIsp = token && role === "sub_isp";
   const isOwner = authEnabled && token && !isSubIsp;
   const isSubBilling = view === "sub_billing";
   const filteredSubIsps = subIsps.filter((sub) => {
@@ -204,6 +204,11 @@ export default function App() {
 
   function closeSubReg() {
     setSubRegOpen(false);
+  }
+
+  function openSubIspLogin() {
+    closeSubReg();
+    openLogin();
   }
 
   function submitPay(e) {
@@ -638,19 +643,37 @@ export default function App() {
       <div className="topbar">
         <div className="brand">
           <span className="brand-mark">TST-ISP</span>
-          <span className="brand-sub">{isSubIsp ? "Sub-ISP Portal" : "Owner Portal"}</span>
+          {authEnabled && <span className="brand-sub">{isSubIsp ? "Sub-ISP Portal" : "Owner Portal"}</span>}
         </div>
         <div className="top-actions">
-          {authEnabled && token ? (
-            <>
-              {!isSubIsp && (
-                <button className={view === "billing" ? "ghost active" : "ghost"} onClick={() => setView("billing")}>
-                  Billing
+          {authEnabled ? (
+            token ? (
+              <>
+                {!isSubIsp && (
+                  <button className={view === "billing" ? "ghost active" : "ghost"} onClick={() => setView("billing")}>
+                    Billing
+                  </button>
+                )}
+                <button
+                  className={view === (isSubIsp ? "sub_dashboard" : "owner_dashboard") ? "ghost active" : "ghost"}
+                  onClick={() => setView(isSubIsp ? "sub_dashboard" : "owner_dashboard")}
+                >
+                  Dashboard
                 </button>
-              )}
+                <button className="login-btn" onClick={logout}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button className="login-btn" onClick={openLogin}>
+                Login
+              </button>
+            )
+          ) : isSubIsp ? (
+            <>
               <button
-                className={view === (isSubIsp ? "sub_dashboard" : "owner_dashboard") ? "ghost active" : "ghost"}
-                onClick={() => setView(isSubIsp ? "sub_dashboard" : "owner_dashboard")}
+                className={view === "sub_dashboard" ? "ghost active" : "ghost"}
+                onClick={() => setView("sub_dashboard")}
               >
                 Dashboard
               </button>
@@ -658,10 +681,6 @@ export default function App() {
                 Logout
               </button>
             </>
-          ) : authEnabled ? (
-            <button className="login-btn" onClick={openLogin}>
-              Login
-            </button>
           ) : null}
         </div>
       </div>
@@ -1051,7 +1070,7 @@ export default function App() {
         </section>
       )}
 
-      {authEnabled && authOpen && (
+      {authOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal-header">
@@ -1141,7 +1160,7 @@ export default function App() {
                 <span>Phone</span>
                 <input
                   type="tel"
-                  placeholder="07XXXXXXXX"
+                  placeholder="07XXXXXXXX or 01XXXXXXXX"
                   value={subRegData.phone}
                   onChange={(e) => setSubRegData((prev) => ({ ...prev, phone: e.target.value.trim() }))}
                   required
@@ -1188,6 +1207,9 @@ export default function App() {
                 {subRegSending ? "Sending..." : "Register & Pay"}
               </button>
               {subRegStatus && <p className="status">{subRegStatus}</p>}
+              <button className="ghost" type="button" onClick={openSubIspLogin}>
+                Already registered? Login
+              </button>
             </form>
           </div>
         </div>
@@ -1213,7 +1235,7 @@ export default function App() {
             <form className="modal-form" onSubmit={submitPay}>
               <label className="field">
                 <span>Phone Number</span>
-                <input type="tel" placeholder="07XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value.trim())} />
+                <input type="tel" placeholder="07XXXXXXXX or 01XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value.trim())} />
               </label>
               {submitted && phoneError && <p className="error">{phoneError}</p>}
 
