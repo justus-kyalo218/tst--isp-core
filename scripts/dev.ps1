@@ -13,7 +13,7 @@ if (!(Get-Command go -ErrorAction SilentlyContinue)) {
 }
 
 $backendCmd = "Set-Location `"$root\\backend`"; go run ./cmd/api"
-$frontendCmd = "Set-Location `"$root\\frontend`"; npm run dev"
+$frontendCmd = "Set-Location `"$root\\frontend`"; npm.cmd run dev"
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd

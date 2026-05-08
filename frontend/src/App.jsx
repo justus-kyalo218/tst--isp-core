@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 const packages = [
@@ -42,6 +42,8 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [token, setToken] = useState(localStorage.getItem("tst_token") || "");
+  const subIspRef = useRef(null);
+  const [showSubIspSection, setShowSubIspSection] = useState(false);
   const [role, setRole] = useState(localStorage.getItem("tst_role") || "");
   const [view, setView] = useState("billing");
   const [users, setUsers] = useState([]);
@@ -121,7 +123,7 @@ export default function App() {
     !subPhoneError &&
     !subPasswordError;
   const isSubIsp = token && role === "sub_isp";
-  const isOwner = authEnabled && token && !isSubIsp;
+  const isOwner = token && !isSubIsp;
   const isSubBilling = view === "sub_billing";
   const filteredSubIsps = subIsps.filter((sub) => {
     if (subIspFilter === "all") return true;
@@ -303,6 +305,13 @@ export default function App() {
     setToken("");
     setRole("");
     setView("billing");
+  }
+
+  function showSubIspPlans() {
+    setShowSubIspSection(true);
+    setTimeout(() => {
+      subIspRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   function submitLogin(e) {
@@ -643,37 +652,19 @@ export default function App() {
       <div className="topbar">
         <div className="brand">
           <span className="brand-mark">TST-ISP</span>
-          {authEnabled && <span className="brand-sub">{isSubIsp ? "Sub-ISP Portal" : "Owner Portal"}</span>}
+          {token && <span className="brand-sub">{isSubIsp ? "Sub-ISP Portal" : "Owner Portal"}</span>}
         </div>
         <div className="top-actions">
-          {authEnabled ? (
-            token ? (
-              <>
-                {!isSubIsp && (
-                  <button className={view === "billing" ? "ghost active" : "ghost"} onClick={() => setView("billing")}>
-                    Billing
-                  </button>
-                )}
-                <button
-                  className={view === (isSubIsp ? "sub_dashboard" : "owner_dashboard") ? "ghost active" : "ghost"}
-                  onClick={() => setView(isSubIsp ? "sub_dashboard" : "owner_dashboard")}
-                >
-                  Dashboard
-                </button>
-                <button className="login-btn" onClick={logout}>
-                  Logout
-                </button>
-              </>
-            ) : (
-              <button className="login-btn" onClick={openLogin}>
-                Login
-              </button>
-            )
-          ) : isSubIsp ? (
+          {token ? (
             <>
+              {!isSubIsp && (
+                <button className={view === "billing" ? "ghost active" : "ghost"} onClick={() => setView("billing")}>
+                  Billing
+                </button>
+              )}
               <button
-                className={view === "sub_dashboard" ? "ghost active" : "ghost"}
-                onClick={() => setView("sub_dashboard")}
+                className={view === (isSubIsp ? "sub_dashboard" : "owner_dashboard") ? "ghost active" : "ghost"}
+                onClick={() => setView(isSubIsp ? "sub_dashboard" : "owner_dashboard")}
               >
                 Dashboard
               </button>
@@ -681,11 +672,15 @@ export default function App() {
                 Logout
               </button>
             </>
-          ) : null}
+          ) : (
+            <button className="login-btn" onClick={openLogin}>
+              Login
+            </button>
+          )}
         </div>
       </div>
 
-      {authEnabled && view === "owner_dashboard" && token && isOwner ? (
+      {view === "owner_dashboard" && token && isOwner ? (
         <section className="dashboard">
           <header className="dash-header">
             <div>
@@ -974,6 +969,22 @@ export default function App() {
             </div>
           </header>
 
+          {!token && !isSubIsp && (
+            <section className="banner">
+              <p className="subtitle">
+                Standard packages are available below. Customers do not need to login or register.
+              </p>
+              <div className="banner-actions">
+                <button className="pay-btn" type="button" onClick={showSubIspPlans}>
+                  Plan Sub-ISP Package
+                </button>
+              </div>
+              <p className="muted">
+                If you are the owner or a Sub-ISP, use the top-right login button to access your dashboard.
+              </p>
+            </section>
+          )}
+
           {isSubIsp ? (
             <div className="dash-grid">
               <section className="dash-card compact">
@@ -1028,6 +1039,32 @@ export default function App() {
             </div>
           ) : (
             <>
+              {showSubIspSection && (
+                <section className="sub-isp">
+                  <div className="sub-isp-header" ref={subIspRef}>
+                    <div>
+                      <p className="kicker">Become a Sub-ISP</p>
+                      <h3 className="dash-title">Grow Your ISP Business</h3>
+                      <p className="subtitle">Pick a plan and register instantly with Mpesa payment.</p>
+                    </div>
+                  </div>
+                  <div className="grid sub-grid">
+                    {subIspPackages.map((pkg) => (
+                      <article key={pkg.name} className="card" onClick={() => openSubReg(pkg)}>
+                        <p className="duration">{pkg.duration}</p>
+                        <p className="price">{pkg.price}</p>
+                        <span className="badge">{pkg.name}</span>
+                        <p className="muted">
+                          {pkg.maxUsers === -1 ? "Unlimited" : pkg.maxUsers} users /{" "}
+                          {pkg.maxRouters === -1 ? "Unlimited" : pkg.maxRouters} routers
+                        </p>
+                        <p className="cta">Tap to register</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               <section>
                 <h3>Standard Packages</h3>
                 <div className="grid">
@@ -1037,30 +1074,6 @@ export default function App() {
                       <p className="price">{pkg.price}</p>
                       <span className="badge">{pkg.tag}</span>
                       <p className="cta">Tap to pay</p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className="sub-isp">
-                <div className="sub-isp-header">
-                  <div>
-                    <p className="kicker">Sub-ISP Plans</p>
-                    <h3 className="dash-title">Grow Your ISP Business</h3>
-                    <p className="subtitle">Pick a plan and register instantly with Mpesa payment.</p>
-                  </div>
-                </div>
-                <div className="grid sub-grid">
-                  {subIspPackages.map((pkg) => (
-                    <article key={pkg.name} className="card" onClick={() => openSubReg(pkg)}>
-                      <p className="duration">{pkg.duration}</p>
-                      <p className="price">{pkg.price}</p>
-                      <span className="badge">{pkg.name}</span>
-                      <p className="muted">
-                        {pkg.maxUsers === -1 ? "Unlimited" : pkg.maxUsers} users /{" "}
-                        {pkg.maxRouters === -1 ? "Unlimited" : pkg.maxRouters} routers
-                      </p>
-                      <p className="cta">Tap to register</p>
                     </article>
                   ))}
                 </div>
@@ -1203,7 +1216,7 @@ export default function App() {
                   {subRegPackage.maxRouters === -1 ? "Unlimited" : subRegPackage.maxRouters} routers.
                 </p>
               )}
-              <button className="pay-btn" type="submit" disabled={!canSubmitSubReg || subRegSending}>
+              <button className="pay-btn" type="submit" disabled={subRegSending}>
                 {subRegSending ? "Sending..." : "Register & Pay"}
               </button>
               {subRegStatus && <p className="status">{subRegStatus}</p>}

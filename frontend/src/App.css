@@ -235,6 +235,10 @@
   font-size: 13px;
 }
 
+.banner-actions {
+  margin: 12px 0;
+}
+
 .topbar {
   display: flex;
   align-items: center;

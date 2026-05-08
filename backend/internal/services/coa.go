@@ -16,6 +16,7 @@ import (
 
 	"tst-isp/internal/db"
 	"tst-isp/internal/models"
+	"tst-isp/pkg/logger"
 	"tst-isp/pkg/utils"
 )
 
@@ -23,26 +24,38 @@ import (
 func SendDisconnect(username string) error {
 	addr, secret := getCoaConfig()
 	if addr == "" || secret == "" {
+		logger.Warn("COA not configured, skipping disconnect for user: %s", username)
 		return nil
 	}
 	if username == "" {
+		logger.Error("attempted COA disconnect with empty username")
 		return errors.New("missing username")
 	}
+
+	logger.Info("sending COA disconnect for user: %s to %s", username, addr)
 
 	packet := radius.New(radius.CodeDisconnectRequest, []byte(secret))
 	rfc2865.UserName_SetString(packet, username)
 
 	host, _, err := net.SplitHostPort(addr)
-	if err == nil {
-		if ip := net.ParseIP(host); ip != nil {
-			rfc2865.NASIPAddress_Set(packet, ip)
-		}
+	if err != nil {
+		logger.Error("invalid COA address %s: %v", addr, err)
+		return err
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		rfc2865.NASIPAddress_Set(packet, ip)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = radius.Exchange(ctx, packet, addr)
-	return err
+	if err != nil {
+		logger.Error("COA disconnect failed for user %s: %v", username, err)
+		return err
+	}
+
+	logger.Info("COA disconnect successful for user: %s", username)
+	return nil
 }
 
 func getCoaConfig() (string, string) {

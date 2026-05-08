@@ -99,15 +99,15 @@ func SubIspRegister(w http.ResponseWriter, r *http.Request) {
 		subIspID = existing.ID
 		_, err = collSubIsps.UpdateOne(r.Context(), bson.M{"_id": subIspID}, bson.M{
 			"$set": bson.M{
-				"name":        req.Business,
+				"name":         req.Business,
 				"contact_name": req.Contact,
-				"phone":       req.Phone,
-				"location":    req.Location,
-				"plan":        req.PackageName,
-				"status":      "pending",
-				"max_users":   maxUsers,
-				"max_routers": maxRouters,
-				"updated_at":  now,
+				"phone":        req.Phone,
+				"location":     req.Location,
+				"plan":         req.PackageName,
+				"status":       "pending",
+				"max_users":    maxUsers,
+				"max_routers":  maxRouters,
+				"updated_at":   now,
 			},
 		})
 		if err != nil {
@@ -146,6 +146,10 @@ func SubIspRegister(w http.ResponseWriter, r *http.Request) {
 	client, err := services.NewDarajaFromEnv()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := client.ResolveCallbackURL(r); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 

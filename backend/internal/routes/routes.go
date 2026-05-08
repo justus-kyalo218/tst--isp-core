@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 
 	"tst-isp/internal/handlers"
 	"tst-isp/internal/middleware"
@@ -11,7 +12,7 @@ func Register() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/health", handlers.Health)
-	mux.HandleFunc("/api/auth/login", handlers.Login)
+	mux.Handle("/api/auth/login", middleware.RateLimit(5, time.Minute)(middleware.ValidateLogin(http.HandlerFunc(handlers.Login))))
 	mux.HandleFunc("/api/mpesa/stkpush", handlers.MpesaSTKPush)
 	mux.HandleFunc("/api/mpesa/callback", handlers.MpesaCallback)
 	mux.HandleFunc("/api/subisp/register", handlers.SubIspRegister)

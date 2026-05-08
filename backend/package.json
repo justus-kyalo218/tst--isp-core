@@ -1,0 +1,8 @@
+{
+  "name": "tst-isp-backend",
+  "private": true,
+  "scripts": {
+    "start": "go run ./cmd/api",
+    "dev": "go run ./cmd/api"
+  }
+}

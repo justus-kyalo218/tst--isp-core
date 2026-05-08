@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -17,32 +17,74 @@ import (
 	"tst-isp/internal/models"
 	"tst-isp/internal/routes"
 	"tst-isp/internal/services"
+	"tst-isp/pkg/logger"
 )
 
+func validateConfig() error {
+	required := []string{"JWT_SECRET", "ROUTER_SECRET_KEY", "MIKROTIK_COA_SECRET"}
+	for _, key := range required {
+		if val := strings.TrimSpace(os.Getenv(key)); val == "" || val == "change-me" {
+			return fmt.Errorf("required env var %s is not set or has default value", key)
+		}
+	}
+
+	// Validate JWT_SECRET length
+	if len(os.Getenv("JWT_SECRET")) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters")
+	}
+
+	// Validate ROUTER_SECRET_KEY length
+	if len(os.Getenv("ROUTER_SECRET_KEY")) < 32 {
+		return fmt.Errorf("ROUTER_SECRET_KEY must be at least 32 characters")
+	}
+
+	// Optional but recommended
+	if addr := os.Getenv("MIKROTIK_COA_ADDR"); addr != "" {
+		if !strings.Contains(addr, ":") {
+			return fmt.Errorf("MIKROTIK_COA_ADDR must be in format host:port")
+		}
+	}
+
+	logger.Info("config validation passed")
+	return nil
+}
+
 func main() {
-	_ = godotenv.Load(".env", "backend/.env")
+	err := godotenv.Load(".env")
+	if err != nil {
+		logger.Warn("error loading .env file: %v", err)
+	}
+
+	if err := validateConfig(); err != nil {
+		logger.Error("config validation failed: %v", err)
+		os.Exit(1)
+	}
 
 	if _, err := db.InitMongo(); err != nil {
-		log.Fatalf("db error: %v", err)
+		logger.Error("db error: %v", err)
+		os.Exit(1)
 	}
 	if rdb, err := db.InitRadius(); err != nil {
 		// Keep local/dev startup resilient when RADIUS is unavailable.
 		// Set RADIUS_REQUIRED=true to enforce a hard dependency.
 		if strings.EqualFold(strings.TrimSpace(os.Getenv("RADIUS_REQUIRED")), "true") {
-			log.Fatalf("radius db error: %v", err)
+			logger.Error("radius db error: %v", err)
+			os.Exit(1)
 		}
-		log.Printf("radius db warning: %v (continuing without radius)", err)
+		logger.Warn("radius db warning: %v (continuing without radius)", err)
 	} else if rdb != nil {
-		log.Printf("radius db connected")
+		logger.Info("radius db connected")
 	} else {
-		log.Printf("radius db not configured")
+		logger.Info("radius db not configured")
 	}
 
 	if err := seedSuperAdmin(); err != nil {
-		log.Fatalf("seed error: %v", err)
+		logger.Error("seed error: %v", err)
+		os.Exit(1)
 	}
 	if err := seedDefaultSubISP(); err != nil {
-		log.Fatalf("seed sub-isp error: %v", err)
+		logger.Error("seed sub-isp error: %v", err)
+		os.Exit(1)
 	}
 
 	port := os.Getenv("PORT")
@@ -63,9 +105,10 @@ func main() {
 	services.StartExpiryWorker(ctx)
 	services.StartRadiusReconcileWorker(ctx)
 
-	log.Printf("API listening on :%s", port)
+	logger.Info("API listening on :%s", port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server error: %v", err)
+		logger.Error("server error: %v", err)
+		os.Exit(1)
 	}
 }
 

@@ -1,0 +1,9 @@
+./attribute.go
+./attributes.go
+./client.go
+./code.go
+./doc.go
+./errors.go
+./packet.go
+./server-packet.go
+./server.go

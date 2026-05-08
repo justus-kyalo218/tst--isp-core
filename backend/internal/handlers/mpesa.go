@@ -55,6 +55,10 @@ func MpesaSTKPush(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if err := client.ResolveCallbackURL(r); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	resp, err := client.STKPush(services.STKPushRequest{
 		Phone:       req.Phone,

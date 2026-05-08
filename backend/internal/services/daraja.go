@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -62,7 +64,7 @@ func NewDarajaFromEnv() (*DarajaClient, error) {
 	if client.ConsumerKey == "" || client.ConsumerSecret == "" || client.Shortcode == "" || client.Passkey == "" {
 		return nil, errors.New("missing Daraja credentials in env")
 	}
-	if client.CallbackURL == "" || client.AccountRef == "" || client.TransactionDesc == "" {
+	if client.AccountRef == "" || client.TransactionDesc == "" {
 		return nil, errors.New("missing Daraja business fields in env")
 	}
 	if client.TransactionType == "" {
@@ -70,6 +72,15 @@ func NewDarajaFromEnv() (*DarajaClient, error) {
 	}
 
 	return client, nil
+}
+
+func (c *DarajaClient) ResolveCallbackURL(r *http.Request) error {
+	callbackURL, err := resolveCallbackURL(c.CallbackURL, r)
+	if err != nil {
+		return err
+	}
+	c.CallbackURL = callbackURL
+	return nil
 }
 
 func (c *DarajaClient) STKPush(req STKPushRequest) (*STKPushResult, error) {
@@ -188,4 +199,93 @@ func normalizePhone(phone string) (string, error) {
 		return phone, nil
 	}
 	return "", errors.New("invalid phone number format")
+}
+
+func resolveCallbackURL(configured string, r *http.Request) (string, error) {
+	configured = strings.TrimSpace(configured)
+	if configured != "" {
+		if err := validatePublicCallbackURL(configured); err == nil {
+			return configured, nil
+		}
+	}
+
+	if inferred := inferCallbackURL(r); inferred != "" {
+		if err := validatePublicCallbackURL(inferred); err == nil {
+			return inferred, nil
+		}
+	}
+
+	if configured != "" {
+		return "", fmt.Errorf("invalid DARAJA_CALLBACK_URL %q: use a public HTTPS URL such as https://your-domain.ngrok-free.app/api/mpesa/callback", configured)
+	}
+
+	return "", errors.New("missing DARAJA_CALLBACK_URL: use a public HTTPS URL such as https://your-domain.ngrok-free.app/api/mpesa/callback or call the API through a public HTTPS tunnel so it can be inferred automatically")
+}
+
+func inferCallbackURL(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+
+	scheme := forwardedHeaderValue(r.Header.Get("X-Forwarded-Proto"))
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+
+	host := forwardedHeaderValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("%s://%s/api/mpesa/callback", strings.ToLower(scheme), host)
+}
+
+func forwardedHeaderValue(raw string) string {
+	if raw == "" {
+		return ""
+	}
+
+	parts := strings.Split(raw, ",")
+	return strings.TrimSpace(parts[0])
+}
+
+func validatePublicCallbackURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid url: %w", err)
+	}
+	if strings.ToLower(u.Scheme) != "https" {
+		return errors.New("callback url must use https")
+	}
+	host := strings.TrimSpace(u.Hostname())
+	if host == "" {
+		return errors.New("callback url must include a host")
+	}
+	if isLocalHost(host) {
+		return errors.New("callback url host must be publicly reachable")
+	}
+	return nil
+}
+
+func isLocalHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return true
+	}
+	if host == "localhost" || host == "0.0.0.0" || host == "::1" || strings.HasSuffix(host, ".local") {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified()
 }
