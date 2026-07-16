@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/mail"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,6 +22,16 @@ type adminUser struct {
 	Package   string    `json:"package"`
 	PaidUntil time.Time `json:"paidUntil"`
 	Active    bool      `json:"active"`
+}
+
+type adminCreateRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type adminCreateResponse struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
 }
 
 func AdminUsers(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +76,49 @@ func AdminUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
+}
+
+func AdminCreateAdmin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req adminCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	if req.Email == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "email and password are required")
+		return
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		writeError(w, http.StatusBadRequest, "email is invalid")
+		return
+	}
+	if len(req.Password) < 8 {
+		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
+		return
+	}
+
+	if err := createSuperAdmin(r.Context(), req.Email, req.Password); err != nil {
+		if errors.Is(err, errEmailRegistered) {
+			writeError(w, http.StatusConflict, "email already registered")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to create admin")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(adminCreateResponse{
+		Email: req.Email,
+		Role:  "super_admin",
+	})
 }
 
 type revenueItem struct {

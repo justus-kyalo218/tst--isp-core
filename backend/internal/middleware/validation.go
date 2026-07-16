@@ -19,6 +19,7 @@ type ValidationErrors []ValidationError
 
 func (ve ValidationErrors) Error() string {
 	if len(ve) == 0 {
+
 		return ""
 	}
 	var msgs []string

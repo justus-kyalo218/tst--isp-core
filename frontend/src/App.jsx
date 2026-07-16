@@ -32,6 +32,7 @@ export default function App() {
   const onAdminPath = adminPath === "/" ? true : locationPath === adminPath || locationPath.startsWith(adminPath + "/");
   const onAdminHost = adminHost !== "" && locationHost === adminHost;
   const authEnabled = adminHost !== "" ? onAdminHost : onAdminPath;
+  const portalUrl = adminHost !== "" && typeof window !== "undefined" ? `${window.location.protocol}//${adminHost}` : adminPath || "/admin";
   const [selected, setSelected] = useState(null);
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -40,7 +41,25 @@ export default function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [forgotPasswordStatus, setForgotPasswordStatus] = useState("");
+  const [forgotPasswordSending, setForgotPasswordSending] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState("");
+  const [resetPasswordStatus, setResetPasswordStatus] = useState("");
+  const [resetPasswordSending, setResetPasswordSending] = useState(false);
+  const [adminRegOpen, setAdminRegOpen] = useState(false);
+  const [adminRegEmail, setAdminRegEmail] = useState("");
+  const [adminRegPassword, setAdminRegPassword] = useState("");
+  const [showAdminRegPassword, setShowAdminRegPassword] = useState(false);
+  const [adminRegError, setAdminRegError] = useState("");
+  const [adminRegSending, setAdminRegSending] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("tst_token") || "");
   const subIspRef = useRef(null);
   const [showSubIspSection, setShowSubIspSection] = useState(false);
@@ -50,6 +69,10 @@ export default function App() {
   const [revenue, setRevenue] = useState({ items: [], total: 0, count: 0 });
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [newAdminStatus, setNewAdminStatus] = useState("");
+  const [newAdminSending, setNewAdminSending] = useState(false);
   const [usageLoading, setUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState("");
   const [usageMap, setUsageMap] = useState({});
@@ -122,8 +145,8 @@ export default function App() {
     subRegData.phone &&
     !subPhoneError &&
     !subPasswordError;
-  const isSubIsp = token && role === "sub_isp";
-  const isOwner = token && !isSubIsp;
+  const isSubIsp = authEnabled && token && role === "sub_isp";
+  const isOwner = authEnabled && token && !isSubIsp;
   const isSubBilling = view === "sub_billing";
   const filteredSubIsps = subIsps.filter((sub) => {
     if (subIspFilter === "all") return true;
@@ -136,6 +159,14 @@ export default function App() {
   const subRouterUnlimited = subRouterLimit < 0;
   const subRouterSlotsLeft = subRouterUnlimited ? Infinity : Math.max(subRouterLimit - subRouterCount, 0);
   const canAddSubRouter = subStatus === "active" && routerName.trim() && (subRouterUnlimited || subRouterSlotsLeft > 0);
+
+  function clearPortalSession() {
+    localStorage.removeItem("tst_token");
+    localStorage.removeItem("tst_role");
+    setToken("");
+    setRole("");
+    setView("billing");
+  }
 
   const formatBytes = (bytes) => {
     if (!bytes || bytes <= 0) return "0 B";
@@ -293,18 +324,39 @@ export default function App() {
     setAuthOpen(true);
     setAuthError("");
     setAuthPassword("");
+    setForgotPasswordMode(false);
+    setForgotPasswordStatus("");
   }
 
   function closeLogin() {
     setAuthOpen(false);
+    setForgotPasswordMode(false);
+    setForgotPasswordStatus("");
+  }
+
+  function closeResetPassword() {
+    setResetPasswordOpen(false);
+    setResetPassword("");
+    setResetPasswordConfirm("");
+    setResetPasswordError("");
+    if (typeof window !== "undefined") {
+      const cleanPath = window.location.pathname.includes("reset-password") ? adminPath || "/admin" : window.location.pathname;
+      window.history.replaceState({}, "", cleanPath);
+    }
+  }
+
+  function openAdminRegister() {
+    setAdminRegOpen(true);
+    setAdminRegError("");
+    setAdminRegPassword("");
+  }
+
+  function closeAdminRegister() {
+    setAdminRegOpen(false);
   }
 
   function logout() {
-    localStorage.removeItem("tst_token");
-    localStorage.removeItem("tst_role");
-    setToken("");
-    setRole("");
-    setView("billing");
+    clearPortalSession();
   }
 
   function showSubIspPlans() {
@@ -339,6 +391,153 @@ export default function App() {
       })
       .catch((err) => {
         setAuthError(err.message || "Login failed.");
+      });
+  }
+
+  function submitForgotPassword(e) {
+    e.preventDefault();
+    setAuthError("");
+    setForgotPasswordStatus("");
+    setForgotPasswordSending(true);
+    fetch(apiBase + "/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: authEmail })
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { message: text };
+        }
+        if (!res.ok) {
+          throw new Error(data?.message || "Password recovery failed.");
+        }
+        return data;
+      })
+      .then((data) => {
+        setForgotPasswordStatus(data.message || "Password recovery request received.");
+      })
+      .catch((err) => {
+        setAuthError(err.message || "Password recovery failed.");
+      })
+      .finally(() => {
+        setForgotPasswordSending(false);
+      });
+  }
+
+  function submitResetPassword(e) {
+    e.preventDefault();
+    setResetPasswordError("");
+    setResetPasswordStatus("");
+    if (resetPassword !== resetPasswordConfirm) {
+      setResetPasswordError("Passwords do not match.");
+      return;
+    }
+    setResetPasswordSending(true);
+    fetch(apiBase + "/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: resetToken, password: resetPassword })
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { message: text };
+        }
+        if (!res.ok) {
+          throw new Error(data?.message || "Password reset failed.");
+        }
+        return data;
+      })
+      .then((data) => {
+        setResetPasswordStatus(data.message || "Password reset successfully.");
+        setResetPassword("");
+        setResetPasswordConfirm("");
+      })
+      .catch((err) => {
+        setResetPasswordError(err.message || "Password reset failed.");
+      })
+      .finally(() => {
+        setResetPasswordSending(false);
+      });
+  }
+
+  function submitAdminRegister(e) {
+    e.preventDefault();
+    setAdminRegError("");
+    setAdminRegSending(true);
+    fetch(apiBase + "/api/auth/admin/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: adminRegEmail,
+        password: adminRegPassword
+      })
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { message: text };
+        }
+        if (!res.ok) {
+          throw new Error(data?.message || "Admin registration failed.");
+        }
+        return data;
+      })
+      .then((data) => {
+        localStorage.setItem("tst_token", data.token);
+        localStorage.setItem("tst_role", data.role);
+        setToken(data.token);
+        setRole(data.role);
+        setView(data.role === "sub_isp" ? "sub_dashboard" : "owner_dashboard");
+        setAdminRegOpen(false);
+      })
+      .catch((err) => {
+        setAdminRegError(err.message || "Admin registration failed.");
+      })
+      .finally(() => {
+        setAdminRegSending(false);
+      });
+  }
+
+  function submitCreateAdmin(e) {
+    e.preventDefault();
+    setNewAdminStatus("");
+    setNewAdminSending(true);
+    fetch(apiBase + "/api/admin/admins", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify({
+        email: newAdminEmail,
+        password: newAdminPassword
+      })
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to create admin.");
+        }
+        return data;
+      })
+      .then((data) => {
+        setNewAdminEmail("");
+        setNewAdminPassword("");
+        setNewAdminStatus(`Admin created: ${data.email || "new admin"}`);
+      })
+      .catch((err) => {
+        setNewAdminStatus(err.message || "Failed to create admin.");
+      })
+      .finally(() => {
+        setNewAdminSending(false);
       });
   }
 
@@ -583,6 +782,22 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromURL = params.get("reset_token") || params.get("token");
+    if (!tokenFromURL) return;
+    setResetToken(tokenFromURL);
+    setResetPasswordOpen(true);
+    setAuthOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (authEnabled) return;
+    if (!token && !role) return;
+    clearPortalSession();
+  }, [authEnabled, token, role]);
+
+  useEffect(() => {
     if (!authEnabled) return;
     if (!token) return;
     if (isSubIsp) return;
@@ -655,7 +870,7 @@ export default function App() {
           {token && <span className="brand-sub">{isSubIsp ? "Sub-ISP Portal" : "Owner Portal"}</span>}
         </div>
         <div className="top-actions">
-          {token ? (
+          {authEnabled ? token ? (
             <>
               {!isSubIsp && (
                 <button className={view === "billing" ? "ghost active" : "ghost"} onClick={() => setView("billing")}>
@@ -674,13 +889,72 @@ export default function App() {
             </>
           ) : (
             <button className="login-btn" onClick={openLogin}>
-              Login
+              Admin / Sub-ISP Login
             </button>
+          ) : (
+            <a className="ghost portal-link" href={portalUrl}>
+              Admin / Sub-ISP Portal
+            </a>
           )}
         </div>
       </div>
 
-      {view === "owner_dashboard" && token && isOwner ? (
+      {authEnabled && !token ? (
+        <section className="dashboard portal-auth">
+          <header className="dash-header">
+            <div>
+              <p className="kicker">Restricted Portal</p>
+              <h2 className="dash-title">Admin / Sub-ISP Access</h2>
+              <p className="subtitle">
+                Use the portal link for admin and Sub-ISP access. Your credentials determine which dashboard opens after login.
+              </p>
+            </div>
+            <a className="ghost portal-link" href="/">
+              Customer Link
+            </a>
+          </header>
+
+          <section className="portal-card">
+            <div>
+              <h3>Login</h3>
+              <p className="muted">Admins and registered Sub-ISPs sign in here.</p>
+            </div>
+            <button className="login-btn" type="button" onClick={openLogin}>
+              Admin / Sub-ISP Login
+            </button>
+          </section>
+
+          <section className="portal-card">
+            <button className="login-btn" type="button" onClick={openAdminRegister}>
+              Register First Admin
+            </button>
+          </section>
+
+          <section className="sub-isp">
+            <div className="sub-isp-header">
+              <div>
+                <p className="kicker">Sub-ISP Registration</p>
+                <h3 className="dash-title">Choose a Sub-ISP Plan</h3>
+                <p className="subtitle">Sub-ISPs register from this portal link. Customers should use the package link.</p>
+              </div>
+            </div>
+            <div className="grid sub-grid">
+              {subIspPackages.map((pkg) => (
+                <article key={pkg.name} className="card" onClick={() => openSubReg(pkg)}>
+                  <p className="duration">{pkg.duration}</p>
+                  <p className="price">{pkg.price}</p>
+                  <span className="badge">{pkg.name}</span>
+                  <p className="muted">
+                    {pkg.maxUsers === -1 ? "Unlimited" : pkg.maxUsers} users /{" "}
+                    {pkg.maxRouters === -1 ? "Unlimited" : pkg.maxRouters} routers
+                  </p>
+                  <p className="cta">Tap to register</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        </section>
+      ) : view === "owner_dashboard" && token && isOwner ? (
         <section className="dashboard">
           <header className="dash-header">
             <div>
@@ -700,6 +974,9 @@ export default function App() {
             </button>
             <button className={adminTab === "users" ? "ghost active" : "ghost"} onClick={() => setAdminTab("users")}>
               Users
+            </button>
+            <button className={adminTab === "admins" ? "ghost active" : "ghost"} onClick={() => setAdminTab("admins")}>
+              Admins
             </button>
           </div>
 
@@ -955,6 +1232,44 @@ export default function App() {
               </div>
             </section>
             )}
+
+            {adminTab === "admins" && (
+              <section className="dash-card compact">
+                <h3>Add Admin</h3>
+                <form className="router-form" onSubmit={submitCreateAdmin}>
+                  <label className="field">
+                    <span>Email</span>
+                    <input
+                      className="input"
+                      type="email"
+                      value={newAdminEmail}
+                      onChange={(e) => setNewAdminEmail(e.target.value.trim())}
+                      placeholder="admin@example.com"
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Password</span>
+                    <input
+                      className="input"
+                      type="password"
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      required
+                    />
+                  </label>
+                  <button className="pay-btn" type="submit" disabled={newAdminSending}>
+                    {newAdminSending ? "Creating..." : "Create Admin"}
+                  </button>
+                </form>
+                {newAdminStatus && (
+                  <p className={newAdminStatus.toLowerCase().includes("failed") || newAdminStatus.toLowerCase().includes("registered") ? "error" : "status"}>
+                    {newAdminStatus}
+                  </p>
+                )}
+              </section>
+            )}
           </div>
         </section>
       ) : (
@@ -974,13 +1289,8 @@ export default function App() {
               <p className="subtitle">
                 Standard packages are available below. Customers do not need to login or register.
               </p>
-              <div className="banner-actions">
-                <button className="pay-btn" type="button" onClick={showSubIspPlans}>
-                  Plan Sub-ISP Package
-                </button>
-              </div>
               <p className="muted">
-                If you are the owner or a Sub-ISP, use the top-right login button to access your dashboard.
+                Only admins and Sub-ISPs can register or login through the portal link. Customers can buy packages, reconnect, or activate vouchers without an account.
               </p>
             </section>
           )}
@@ -1078,6 +1388,29 @@ export default function App() {
                   ))}
                 </div>
               </section>
+
+              <section className="customer-dashboard" aria-label="Customer dashboard">
+                <form className="customer-panel" onSubmit={(e) => e.preventDefault()}>
+                  <h3>Reconnect</h3>
+                  <input type="text" placeholder="M-Pesa code (e.g. QAH9QWWZRR)" />
+                  <button className="customer-primary" type="submit">
+                    Reconnect
+                  </button>
+                </form>
+
+                <form className="customer-panel highlighted" onSubmit={(e) => e.preventDefault()}>
+                  <h3>Voucher</h3>
+                  <input type="text" placeholder="Enter voucher code" />
+                  <button className="customer-outline" type="submit">
+                    Activate
+                  </button>
+                </form>
+              </section>
+
+              <button className="tv-pay" type="button">
+                <span aria-hidden="true">▣</span>
+                Pay for a TV
+              </button>
             </>
           )}
         </section>
@@ -1089,24 +1422,171 @@ export default function App() {
             <div className="modal-header">
               <div>
                 <p className="modal-kicker">Authentication</p>
-                <h2 className="modal-title">Login</h2>
+                <h2 className="modal-title">{forgotPasswordMode ? "Reset Password" : "Admin / Sub-ISP Login"}</h2>
               </div>
               <button className="modal-close" onClick={closeLogin} aria-label="Close">
                 x
               </button>
             </div>
-            <form className="modal-form" onSubmit={submitLogin}>
+            <form className="modal-form" onSubmit={forgotPasswordMode ? submitForgotPassword : submitLogin}>
               <label className="field">
                 <span>Email</span>
                 <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value.trim())} required />
               </label>
+              {!forgotPasswordMode && (
+                <label className="field">
+                  <span>Password</span>
+                  <div className="password-control">
+                    <input
+                      type={showAuthPassword ? "text" : "password"}
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowAuthPassword((show) => !show)}
+                      aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showAuthPassword}
+                    >
+                      {showAuthPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </label>
+              )}
+              {forgotPasswordMode && (
+                <p className="hint">Enter your admin or Sub-ISP email and we will send a password reset link.</p>
+              )}
+              {authError && <p className="error">{authError}</p>}
+              {forgotPasswordStatus && <p className="status">{forgotPasswordStatus}</p>}
+              <button className="pay-btn" type="submit" disabled={forgotPasswordSending}>
+                {forgotPasswordMode ? (forgotPasswordSending ? "Sending..." : "Send Recovery") : "Login"}
+              </button>
+              <button
+                className="text-action"
+                type="button"
+                onClick={() => {
+                  setAuthError("");
+                  setForgotPasswordStatus("");
+                  setForgotPasswordMode((mode) => !mode);
+                }}
+              >
+                {forgotPasswordMode ? "Back to login" : "Forgot password?"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {resetPasswordOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <div>
+                <p className="modal-kicker">Account Recovery</p>
+                <h2 className="modal-title">Set New Password</h2>
+              </div>
+              <button className="modal-close" onClick={closeResetPassword} aria-label="Close">
+                x
+              </button>
+            </div>
+            <form className="modal-form" onSubmit={submitResetPassword}>
+              <label className="field">
+                <span>New Password</span>
+                <div className="password-control">
+                  <input
+                    type={showResetPassword ? "text" : "password"}
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowResetPassword((show) => !show)}
+                    aria-label={showResetPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showResetPassword}
+                  >
+                    {showResetPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </label>
+              <label className="field">
+                <span>Confirm Password</span>
+                <input
+                  type={showResetPassword ? "text" : "password"}
+                  value={resetPasswordConfirm}
+                  onChange={(e) => setResetPasswordConfirm(e.target.value)}
+                  minLength={8}
+                  required
+                />
+              </label>
+              <p className="hint">Reset links expire after 1 hour and can only be used once.</p>
+              {resetPasswordError && <p className="error">{resetPasswordError}</p>}
+              {resetPasswordStatus && <p className="status">{resetPasswordStatus}</p>}
+              <button className="pay-btn" type="submit" disabled={resetPasswordSending || Boolean(resetPasswordStatus)}>
+                {resetPasswordSending ? "Resetting..." : "Reset Password"}
+              </button>
+              {resetPasswordStatus && (
+                <button
+                  className="text-action"
+                  type="button"
+                  onClick={() => {
+                    closeResetPassword();
+                    openLogin();
+                  }}
+                >
+                  Back to login
+                </button>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {adminRegOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <div>
+                <p className="modal-kicker">Admin Access</p>
+                <h2 className="modal-title">Register Admin</h2>
+              </div>
+              <button className="modal-close" onClick={closeAdminRegister} aria-label="Close">
+                x
+              </button>
+            </div>
+            <form className="modal-form" onSubmit={submitAdminRegister}>
+              <label className="field">
+                <span>Email</span>
+                <input type="email" value={adminRegEmail} onChange={(e) => setAdminRegEmail(e.target.value.trim())} required />
+              </label>
               <label className="field">
                 <span>Password</span>
-                <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required />
+                <div className="password-control">
+                  <input
+                    type={showAdminRegPassword ? "text" : "password"}
+                    value={adminRegPassword}
+                    onChange={(e) => setAdminRegPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowAdminRegPassword((show) => !show)}
+                    aria-label={showAdminRegPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showAdminRegPassword}
+                  >
+                    {showAdminRegPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </label>
-              {authError && <p className="error">{authError}</p>}
-              <button className="pay-btn" type="submit">
-                Login
+              <p className="hint">This works only when no admin account exists yet.</p>
+              {adminRegError && <p className="error">{adminRegError}</p>}
+              <button className="pay-btn" type="submit" disabled={adminRegSending}>
+                {adminRegSending ? "Registering..." : "Register First Admin"}
               </button>
             </form>
           </div>
