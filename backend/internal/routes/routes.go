@@ -11,6 +11,12 @@ import (
 func Register() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok","service":"TST ISP Core API"}`))
+	})
+
 	mux.HandleFunc("/api/health", handlers.Health)
 	mux.Handle("/api/auth/login", middleware.RateLimit(5, time.Minute)(middleware.ValidateLogin(http.HandlerFunc(handlers.Login))))
 	mux.Handle("/api/auth/forgot-password", middleware.RateLimit(5, time.Hour)(http.HandlerFunc(handlers.ForgotPassword)))
